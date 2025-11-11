@@ -110,6 +110,128 @@ app.get("/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
+// Create incident endpoint
+app.post("/api/incidents", async (req, res) => {
+  const sid = req.cookies.sid;
+  const session = tokenStore.get(sid);
+
+  if (!session || !session.access_token) return res.status(401).json({ error: 'Not authenticated' });
+
+  const payload = {
+    short_description: req.body.short_description,
+    impact: req.body.impact,
+    urgency: req.body.urgency,
+    category: req.body.category,
+    subcategory: req.body.subcategory,
+    assignment_group: req.body.assignment_group,
+  };
+
+  // helper to call ServiceNow create
+  const callCreate = async (accessToken) => {
+    return axios({
+      method: 'post',
+      url: `${SN_INTANCE}/api/now/table/incident`,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      data: payload,
+    });
+  };
+
+  try {
+    // First attempt
+    const response = await callCreate(session.access_token);
+    return res.json(response.data);
+  } catch (error) {
+    // If token expired, try refresh and retry
+    if (error.response?.status === 401 && session.refresh_token) {
+      try {
+        const data = {
+          grant_type: 'refresh_token',
+          refresh_token: session.refresh_token,
+          client_id: CLIENT_ID,
+        };
+
+        const refresh = await axios.post(tokenEndpoint, stringify(data), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+
+        // store new tokens
+        tokenStore.set(sid, { ...session, ...refresh.data });
+        const newSession = tokenStore.get(sid);
+
+        // retry create with new access token
+        const retry = await callCreate(newSession.access_token);
+        return res.json(retry.data);
+      } catch (refreshErr) {
+        console.error('Token refresh/create retry failed:', refreshErr.response?.data || refreshErr.message);
+        return res.status(401).json({ error: 'Session expired, please re-authenticate', details: refreshErr.response?.data });
+      }
+    }
+
+    console.error('Error creating incident:', error.response?.data || error.message);
+    return res.status(error.response?.status || 500).json({ error: error.response?.data || 'Failed to create incident' });
+  }
+});
+
+
+
+// Delete incident endpoint
+app.delete("/api/incidents/:sys_id", async (req, res) => {
+  const sid = req.cookies.sid;
+  const session = tokenStore.get(sid);
+
+  if (!session.access_token) return res.status(401).send("Not authenticated");
+
+  try {
+    await axios({
+      method: 'delete',
+      url: `${SN_INTANCE}/api/now/table/incident/${req.params.sys_id}`,
+      headers: { 
+        'Authorization': `Bearer ${session.access_token}`,
+        'Accept': 'application/json'
+      }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting incident:', error.response?.data || error);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error?.message || "Error deleting incident"
+    });
+  }
+});
+
+// Update incident endpoint
+app.put("/api/incidents/:sys_id", async (req, res) => {
+  const sid = req.cookies.sid;
+  const session = tokenStore.get(sid);
+
+  if (!session.access_token) return res.status(401).send("Not authenticated");
+
+  try {
+    console.log('Updating incident:', req.params.sys_id, req.body);
+    const response = await axios({
+      method: 'patch', // ServiceNow prefers PATCH for updates
+      url: `${SN_INTANCE}/api/now/table/incident/${req.params.sys_id}`,
+      headers: { 
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      data: req.body
+    });
+    console.log('Update response:', response.data);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error updating incident:', error.response?.data || error);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error?.message || "Error updating incident"
+    });
+  }
+});
+
 app.get("/api/incidents", async (req, res) => {
   const sid = req.cookies.sid;
   const session = tokenStore.get(sid);
