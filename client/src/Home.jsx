@@ -15,8 +15,9 @@ import {
   FormControl,
   InputLabel,
   Box,
-  ButtonGroup,
 } from "@mui/material";
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -32,10 +33,11 @@ export default function Home() {
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createIncident, setCreateIncident] = useState({
-    description: '',
+    short_description: '',
     impact: '',
     urgency: ''
   });
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleDelete = async (sys_id) => {
     if (window.confirm('Are you sure you want to delete this incident?')) {
@@ -60,7 +62,7 @@ export default function Home() {
   const handleCreateOpen = () => setCreateDialogOpen(true);
   const handleCreateClose = () => {
     setCreateDialogOpen(false);
-    setCreateIncident({ description: '', impact: '', urgency: '' });
+    setCreateIncident({ short_description: '', impact: '', urgency: '' });
   };
 
   const handleCreateInput = (e) => {
@@ -69,22 +71,23 @@ export default function Home() {
   };
 
   const handleCreateSubmit = async () => {
-    if (!createIncident.description || !createIncident.impact || !createIncident.urgency) {
-      alert('Please fill description, impact and urgency');
+    if (!createIncident.short_description || !createIncident.impact || !createIncident.urgency) {
+      alert('Please fill short description, impact and urgency');
       return;
     }
 
     try {
       const payload = {
-        short_description: createIncident.description,
-        impact: createIncident.impact,
-        urgency: createIncident.urgency
+        short_description: createIncident.short_description,
+        impact: Number(createIncident.impact),
+        urgency: Number(createIncident.urgency)
       };
 
       const response = await axios.post('http://localhost:3001/api/incidents', payload, { withCredentials: true });
 
       if (response.data && response.data.result) {
         handleCreateClose();
+        setSuccessMessage('Incident created successfully');
         // small delay to allow instance to process
         setTimeout(fetchData, 800);
       } else if (response.data && response.data.error) {
@@ -107,7 +110,9 @@ export default function Home() {
       sys_id: incident.sys_id,
       short_description: incident.short_description,
       state: incident.state,
-      priority: incident.priority
+      priority: incident.priority,
+      impact: incident.impact || '',
+      urgency: incident.urgency || ''
     });
     setEditDialogOpen(true);
   };
@@ -125,13 +130,25 @@ export default function Home() {
       }
 
       console.log('Saving incident:', selectedIncident);
+      // compute priority from impact and urgency: priority = impact + urgency - 1 (cap at 5)
+      const impactVal = selectedIncident.impact ? Number(selectedIncident.impact) : undefined;
+      const urgencyVal = selectedIncident.urgency ? Number(selectedIncident.urgency) : undefined;
+      let computedPriority;
+      if (impactVal && urgencyVal) {
+        computedPriority = Math.min(impactVal + urgencyVal - 1, 5);
+      }
+
+      const payload = {
+        short_description: selectedIncident.short_description,
+        impact: impactVal,
+        urgency: urgencyVal,
+        state: selectedIncident.state,
+        ...(computedPriority !== undefined ? { priority: computedPriority } : {}),
+      };
+
       const response = await axios.put(
         `http://localhost:3001/api/incidents/${selectedIncident.sys_id}`,
-        {
-          short_description: selectedIncident.short_description,
-          state: selectedIncident.state,
-          priority: selectedIncident.priority
-        },
+        payload,
         { 
           withCredentials: true,
           headers: {
@@ -140,9 +157,11 @@ export default function Home() {
         }
       );
 
-      if (response.data.result) {
+      if (response.data && response.data.result) {
         handleEditClose();
         fetchData();
+      } else if (response.data && response.data.error) {
+        throw new Error(JSON.stringify(response.data.error));
       } else {
         throw new Error('Update operation did not return result');
       }
@@ -201,9 +220,9 @@ export default function Home() {
               <DialogContent>
                 <Stack spacing={2} sx={{ mt: 1 }}>
                   <TextField
-                    name="description"
+                    name="short_description"
                     label="Short Description"
-                    value={createIncident.description}
+                    value={createIncident.short_description}
                     onChange={handleCreateInput}
                     multiline
                     rows={3}
@@ -237,7 +256,17 @@ export default function Home() {
               {incidents.map((inc, index) => {
                 return (
                   <Grid key={inc.sys_id}>
-                    <Card sx={{ width: 320, height: 220, borderRadius: 2, boxShadow: 3 }}>
+                    <Card
+                      sx={{
+                        width: 320,
+                        height: 220,
+                        borderRadius: 2,
+                        boxShadow: 3,
+                        bgcolor: theme.palette.mode === 'light' ? '#f5f5f5' : undefined,
+                        border: theme.palette.mode === 'light' ? '1px solid' : 'none',
+                        borderColor: theme.palette.mode === 'light' ? '#e0e0e0' : 'transparent',
+                      }}
+                    >
                       <CardContent sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
                         <Box>
                           <Typography variant="h6" sx={{ mb: 1 }}>
@@ -272,11 +301,28 @@ export default function Home() {
                           </Box>
                         </Box>
 
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                          <ButtonGroup variant="outlined" size="small" aria-label="edit delete group">
-                            <Button startIcon={<EditIcon />} color="primary" onClick={() => handleEditClick(inc)} sx={{ textTransform: 'none' }}>Edit</Button>
-                            <Button startIcon={<DeleteIcon />} color="error" onClick={() => handleDelete(inc.sys_id)} sx={{ textTransform: 'none' }}>Delete</Button>
-                          </ButtonGroup>
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, alignItems: 'center' }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<EditIcon />}
+                            color="primary"
+                            onClick={() => handleEditClick(inc)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<DeleteIcon />}
+                            color="error"
+                            onClick={() => handleDelete(inc.sys_id)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Delete
+                          </Button>
                         </Box>
                       </CardContent>
                     </Card>
@@ -299,6 +345,32 @@ export default function Home() {
                     rows={4}
                     fullWidth
                   />
+                  <FormControl fullWidth sx={{ mt: 1 }}>
+                    <InputLabel>Impact</InputLabel>
+                    <Select
+                      name="impact"
+                      value={selectedIncident?.impact || ''}
+                      onChange={handleInputChange}
+                      label="Impact"
+                    >
+                      <MenuItem value="1">High (1)</MenuItem>
+                      <MenuItem value="2">Medium (2)</MenuItem>
+                      <MenuItem value="3">Low (3)</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth sx={{ mt: 1 }}>
+                    <InputLabel>Urgency</InputLabel>
+                    <Select
+                      name="urgency"
+                      value={selectedIncident?.urgency || ''}
+                      onChange={handleInputChange}
+                      label="Urgency"
+                    >
+                      <MenuItem value="1">High (1)</MenuItem>
+                      <MenuItem value="2">Medium (2)</MenuItem>
+                      <MenuItem value="3">Low (3)</MenuItem>
+                    </Select>
+                  </FormControl>
                   <FormControl fullWidth>
                     <InputLabel>State</InputLabel>
                     <Select
@@ -314,21 +386,7 @@ export default function Home() {
                       <MenuItem value="Closed">Closed</MenuItem>
                     </Select>
                   </FormControl>
-                  <FormControl fullWidth>
-                    <InputLabel>Priority</InputLabel>
-                    <Select
-                      name="priority"
-                      value={selectedIncident?.priority || ''}
-                      onChange={handleInputChange}
-                      label="Priority"
-                    >
-                      <MenuItem value="1">1 - Critical</MenuItem>
-                      <MenuItem value="2">2 - High</MenuItem>
-                      <MenuItem value="3">3 - Moderate</MenuItem>
-                      <MenuItem value="4">4 - Low</MenuItem>
-                      <MenuItem value="5">5 - Planning</MenuItem>
-                    </Select>
-                  </FormControl>
+                  {/* Priority is computed from Impact and Urgency; removed editable priority field */}
                 </Stack>
               </DialogContent>
               <DialogActions>
@@ -339,6 +397,11 @@ export default function Home() {
               </DialogActions>
             </Dialog>
           </Stack>
+            <Snackbar open={!!successMessage} autoHideDuration={4000} onClose={() => setSuccessMessage('')}>
+              <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+                {successMessage}
+              </Alert>
+            </Snackbar>
         </>
       ) : (
         <Typography>Please log in</Typography>

@@ -240,7 +240,7 @@ app.get("/api/incidents", async (req, res) => {
 
   try {
     const r = await axios.get(
-      `${SN_INTANCE}/api/now/table/incident?sysparm_display_value=true&sysparm_fields=sys_id%2Cnumber%2Cstate%2Cpriority%2Cshort_description`,
+      `${SN_INTANCE}/api/now/table/incident?sysparm_display_value=true&sysparm_fields=sys_id%2Cnumber%2Cstate%2Cpriority%2Cshort_description%2Cimpact%2Curgency`,
       {
         headers: { Authorization: `Bearer ${session.access_token}` },
       }
@@ -262,12 +262,12 @@ app.get("/api/incidents", async (req, res) => {
         tokenStore.set(sid, { ...session, ...refresh.data });
 
         const retry = await axios.get(
-          `${SN_INTANCE}/api/now/table/incident?sysparm_display_value=true&sysparm_fields=number%2Cstate%2Cpriority%2Cshort_description`,
+          `${SN_INTANCE}/api/now/table/incident?sysparm_display_value=true&sysparm_fields=sys_id%2Cnumber%2Cstate%2Cpriority%2Cshort_description%2Cimpact%2Curgency`,
           {
             headers: { Authorization: `Bearer ${session.access_token}` },
           }
         );
-        res.json(r.data);
+        res.json(retry.data);
       } catch (e) {
         res.status(401).send("Session Expired");
       }
