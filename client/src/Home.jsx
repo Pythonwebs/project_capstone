@@ -14,8 +14,14 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Box,
+  ButtonGroup,
 } from "@mui/material";
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useContext, useEffect, useState } from "react";
+import { useTheme } from '@mui/material/styles';
 import { AuthContext } from "./AuthProvider";
 import axios from "axios";
 
@@ -154,6 +160,8 @@ export default function Home() {
     }));
   };
 
+  const theme = useTheme();
+
   async function fetchData() {
     if (isLogged) {
       const incidentList = await axios.get(
@@ -174,10 +182,18 @@ export default function Home() {
         <>
           <Stack spacing={3}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="h5">Incident Records:</Typography>
-              <Button variant="contained" color="primary" onClick={handleCreateOpen}>
-                Create New Incident
-              </Button>
+              <Typography variant="h5" sx={{ letterSpacing: 0.5 }}>Incident Records</Typography>
+              <Box>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateOpen}
+                  sx={{ borderRadius: 2, px: 3, py: 1.2, textTransform: 'none', fontWeight: 600 }}
+                >
+                  Create New Incident
+                </Button>
+              </Box>
             </Stack>
 
             <Dialog open={createDialogOpen} onClose={handleCreateClose} maxWidth="sm" fullWidth>
@@ -221,36 +237,47 @@ export default function Home() {
               {incidents.map((inc, index) => {
                 return (
                   <Grid key={inc.sys_id}>
-                    <Card sx={{ width: 300, height: 200 }}>
-                      <CardContent>
-                        <Typography variant="h6">
-                          Incident #: {inc.number}
-                        </Typography>
-                        <Typography variant="body2">
-                          Description: {inc.short_description}
-                        </Typography>
-                        <Typography variant="body2">
-                          State: {inc.state}
-                        </Typography>
-                        <Typography variant="body2">
-                          Priority: {inc.priority}
-                        </Typography>
-                        <Button
-                          sx={{ mt: 1 }}
-                          variant="contained"
-                          color="success"
-                          onClick={() => handleEditClick(inc)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          sx={{ mt: 1, mx: 1 }}
-                          variant="contained"
-                          color="error"
-                          onClick={() => handleDelete(inc.sys_id)}
-                        >
-                          Delete
-                        </Button>
+                    <Card sx={{ width: 320, height: 220, borderRadius: 2, boxShadow: 3 }}>
+                      <CardContent sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        <Box>
+                          <Typography variant="h6" sx={{ mb: 1 }}>
+                            Incident #: {inc.number}
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                            {inc.short_description}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100',
+                                color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.text.secondary,
+                                px: 1,
+                                borderRadius: 1,
+                              }}
+                            >
+                              {inc.state}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100',
+                                color: theme.palette.mode === 'dark' ? theme.palette.text.primary : theme.palette.text.secondary,
+                                px: 1,
+                                borderRadius: 1,
+                              }}
+                            >
+                              Priority: {inc.priority}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                          <ButtonGroup variant="outlined" size="small" aria-label="edit delete group">
+                            <Button startIcon={<EditIcon />} color="primary" onClick={() => handleEditClick(inc)} sx={{ textTransform: 'none' }}>Edit</Button>
+                            <Button startIcon={<DeleteIcon />} color="error" onClick={() => handleDelete(inc.sys_id)} sx={{ textTransform: 'none' }}>Delete</Button>
+                          </ButtonGroup>
+                        </Box>
                       </CardContent>
                     </Card>
                   </Grid>
