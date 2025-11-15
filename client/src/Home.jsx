@@ -15,12 +15,15 @@ import {
   FormControl,
   InputLabel,
   Box,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useContext, useEffect, useState } from "react";
 import { useTheme } from '@mui/material/styles';
 import { AuthContext } from "./AuthProvider";
@@ -29,6 +32,8 @@ import axios from "axios";
 export default function Home() {
   const { isLogged } = useContext(AuthContext);
   const [incidents, setIncidents] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState('number');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -202,7 +207,46 @@ export default function Home() {
           <Stack spacing={3}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="h5" sx={{ letterSpacing: 0.5 }}>Incident Records</Typography>
-              <Box>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel id="search-field-label">Search Field</InputLabel>
+                  <Select
+                    labelId="search-field-label"
+                    value={searchField}
+                    label="Search Field"
+                    onChange={(e) => setSearchField(e.target.value)}
+                  >
+                    <MenuItem value="number">Incident Number</MenuItem>
+                    <MenuItem value="state">State</MenuItem>
+                    <MenuItem value="short_description">Short Description</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  placeholder={
+                    searchField === 'number' ? 'Search by incident number' :
+                    searchField === 'state' ? 'Search by state' :
+                    'Search by description'
+                  }
+                  size="small"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchTerm('')}
+                          aria-label="clear-search"
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{ minWidth: 320, bgcolor: theme.palette.mode === 'light' ? 'white' : undefined }}
+                />
+
                 <Button
                   variant="contained"
                   color="primary"
@@ -253,9 +297,21 @@ export default function Home() {
             </Dialog>
 
             <Grid container spacing={5} justifyContent={"space-around"}>
-              {incidents.map((inc, index) => {
-                return (
-                  <Grid key={inc.sys_id}>
+              {incidents
+                .filter(inc => {
+                  if (!searchTerm) return true;
+                  const q = searchTerm.toLowerCase();
+                  const number = (inc.number || '').toLowerCase();
+                  const state = (inc.state || '').toLowerCase();
+                  const desc = (inc.short_description || '').toLowerCase();
+                  if (searchField === 'number') return number.includes(q);
+                  if (searchField === 'state') return state.includes(q);
+                  if (searchField === 'short_description') return desc.includes(q);
+                  return true;
+                })
+                .map((inc, index) => {
+                  return (
+                    <Grid key={inc.sys_id}>
                     <Card
                       sx={{
                         width: 320,
