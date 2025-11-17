@@ -219,6 +219,7 @@ export default function Home() {
                     <MenuItem value="number">Incident Number</MenuItem>
                     <MenuItem value="state">State</MenuItem>
                     <MenuItem value="short_description">Short Description</MenuItem>
+                    <MenuItem value="priority">Priority</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -226,6 +227,7 @@ export default function Home() {
                   placeholder={
                     searchField === 'number' ? 'Search by incident number' :
                     searchField === 'state' ? 'Search by state' :
+                    searchField === 'priority' ? 'Search by priority' :
                     'Search by description'
                   }
                   size="small"
@@ -304,8 +306,10 @@ export default function Home() {
                   const number = (inc.number || '').toLowerCase();
                   const state = (inc.state || '').toLowerCase();
                   const desc = (inc.short_description || '').toLowerCase();
+                  const priority = (inc.priority !== undefined && inc.priority !== null) ? String(inc.priority).toLowerCase() : '';
                   if (searchField === 'number') return number.includes(q);
                   if (searchField === 'state') return state.includes(q);
+                  if (searchField === 'priority') return priority.includes(q);
                   if (searchField === 'short_description') return desc.includes(q);
                   return true;
                 })
